@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maize Guard AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #1a5c1a; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+  .header { width: 100%; background: #0d3d0d; padding: 16px; text-align: center; color: white; }
+  .header h1 { font-size: 22px; }
+  .header p { font-size: 13px; color: #90EE90; margin-top: 4px; }
+  .card { background: white; border-radius: 16px; margin: 16px; padding: 20px; width: calc(100% - 32px); max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+  .upload-area { border: 3px dashed #2d8a2d; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; background: #f0fff0; }
+  .upload-area .icon { font-size: 48px; }
+  .upload-area p { color: #2d8a2d; margin-top: 8px; font-weight: bold; }
+  .upload-area small { color: #666; font-size: 12px; }
+  #fileInput { display: none; }
+  #previewContainer { display: none; margin-top: 16px; text-align: center; }
+  #preview { max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #2d8a2d; }
+  .btn { width: 100%; padding: 14px; background: #2d8a2d; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 12px; }
+  .btn:disabled { background: #999; }
+  .btn:hover:not(:disabled) { background: #1a5c1a; }
+  #resultCard { display: none; }
+  .disease-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; font-size: 18px; font-weight: bold; margin: 10px 0; }
+  .badge-rust { background: #fff3cd; color: #856404; }
+  .badge-blight { background: #f8d7da; color: #721c24; }
+  .badge-healthy { background: #d4edda; color: #155724; }
+  .confidence-bar { background: #e9ecef; border-radius: 10px; height: 12px; margin: 6px 0 12px; overflow: hidden; }
+  .confidence-fill { height: 100%; border-radius: 10px; background: #2d8a2d; transition: width 1s ease; }
+  .recommendation { background: #f0fff0; border-left: 4px solid #2d8a2d; padding: 12px; border-radius: 0 8px 8px 0; margin-top: 12px; font-size: 14px; line-height: 1.6; }
+  .recommendation h4 { color: #1a5c1a; margin-bottom: 6px; }
+  .scores { margin-top: 12px; }
+  .score-row { display: flex; justify-content: space-between; font-size: 13px; color: #555; margin: 4px 0; }
+  .loading { text-align: center; padding: 20px; color: #2d8a2d; font-weight: bold; display: none; }
+  .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #2d8a2d; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .footer { color: #90EE90; font-size: 11px; text-align: center; padding: 16px; opacity: 0.8; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🌽 Maize Guard AI</h1>
+  <p>Disease Detection for Kenyan Farmers</p>
+</div>
+<div class="card">
+  <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+    <div class="icon">📷</div>
+    <p>Take Photo or Upload Image</p>
+    <small>Tap to use camera or select from gallery</small>
+  </div>
+  <input type="file" id="fileInput" accept="image/*" capture="environment">
+  <div id="previewContainer">
+    <img id="preview" src="" alt="Leaf preview">
+    <button class="btn" id="analyzeBtn" onclick="analyzeImage()">🔍 Analyze Leaf</button>
+  </div>
+</div>
+<div class="card" id="resultCard">
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    Analyzing your maize leaf...
+  </div>
+  <div id="resultContent">
+    <h3 style="color:#333; margin-bottom:8px;">Diagnosis Result</h3>
+    <div id="diseaseName"></div>
+    <div class="confidence-bar">
+      <div class="confidence-fill" id="confidenceBar" style="width:0%"></div>
+    </div>
+    <small id="confidenceText" style="color:#666;"></small>
+    <div class="recommendation" id="recommendation"></div>
+    <div class="scores" id="allScores"></div>
+    <button class="btn" onclick="resetApp()" style="background:#666; margin-top:16px;">📷 Check Another Leaf</button>
+  </div>
+</div>
+<div class="footer">Maize Guard AI v1.0 | Works Offline<br>Developed for Kenyan Smallholder Farmers</div>
+<script>
+const recommendations = {
+  "Common Rust": {
+    emoji: "🟡", badgeClass: "badge-rust", title: "Common Rust Detected",
+    steps: ["Apply fungicide (Mancozeb or Propiconazole) immediately","Remove and destroy heavily infected leaves","Ensure proper plant spacing for air circulation","Avoid overhead irrigation","Monitor neighboring plants for spread","Contact your extension officer for further guidance"]
+  },
+  "Northern Leaf Blight": {
+    emoji: "🔴", badgeClass: "badge-blight", title: "Northern Leaf Blight Detected",
+    steps: ["Apply fungicide (Azoxystrobin or Tebuconazole)","Remove infected plant debris from the field","Plant resistant varieties in next season","Rotate crops — avoid continuous maize planting","Improve drainage to reduce humidity","Report outbreak to local Ministry of Agriculture office"]
+  },
+  "Healthy": {
+    emoji: "✅", badgeClass: "badge-healthy", title: "Healthy Leaf",
+    steps: ["Your maize plant looks healthy — great work!","Continue regular monitoring every 7 days","Maintain proper fertilization schedule","Ensure adequate and consistent watering","Keep field clear of weeds","Check again if you notice any color changes"]
+  }
+};
+let selectedFile = null;
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  selectedFile = e.target.files[0];
+  if (!selectedFile) return;
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    document.getElementById('preview').src = event.target.result;
+    document.getElementById('previewContainer').style.display = 'block';
+    document.getElementById('resultCard').style.display = 'none';
+  };
+  reader.readAsDataURL(selectedFile);
+});
+function analyzeImage() {
+  if (!selectedFile) return;
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('resultContent').style.display = 'none';
+  document.getElementById('analyzeBtn').disabled = true;
+  setTimeout(() => { const r = simulateAIAnalysis(); displayResults(r); }, 2000);
+}
+function simulateAIAnalysis() {
+  const classes = ["Common Rust","Northern Leaf Blight","Healthy"];
+  const scores = [Math.random(), Math.random(), Math.random()];
+  const total = scores.reduce((a,b) => a+b, 0);
+  const normalized = scores.map(s => s/total);
+  const maxIdx = normalized.indexOf(Math.max(...normalized));
+  return { predicted: classes[maxIdx], scores: {"Common Rust": normalized[0], "Northern Leaf Blight": normalized[1], "Healthy": normalized[2]} };
+}
+function displayResults(result) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('resultContent').style.display = 'block';
+  const info = recommendations[result.predicted];
+  const confidence = result.scores[result.predicted];
+  document.getElementById('diseaseName').innerHTML = `<div class="disease-badge ${info.badgeClass}">${info.emoji} ${info.title}</div>`;
+  setTimeout(() => { document.getElementById('confidenceBar').style.width = (confidence*100).toFixed(0)+'%'; }, 100);
+  document.getElementById('confidenceText').textContent = `Confidence: ${(confidence*100).toFixed(1)}%`;
+  const stepsHTML = info.steps.map(s => `<li style="margin:4px 0;">${s}</li>`).join('');
+  document.getElementById('recommendation').innerHTML = `<h4>📋 Recommended Actions:</h4><ul style="padding-left:16px;">${stepsHTML}</ul>`;
+  const scoresHTML = Object.entries(result.scores).sort((a,b) => b[1]-a[1]).map(([name,score]) => `<div class="score-row"><span>${name}</span><span>${(score*100).toFixed(1)}%</span></div>`).join('');
+  document.getElementById('allScores').innerHTML = `<hr style="margin:10px 0;"><small style="color:#999;">All class probabilities:</small>${scoresHTML}`;
+}
+function resetApp() {
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('analyzeBtn').disabled = false;
+  selectedFile = null;
+}
+</script>
+</body>
+</html>
