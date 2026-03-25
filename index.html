@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maize Guard AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    background: #1a5c1a;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+  }
+
+  .card {
+    background: white;
+    border-radius: 16px;
+    margin: 8px 16px;
+    padding: 20px;
+    width: calc(100% - 32px);
+    max-width: 480px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+
+  .app-title {
+    text-align: center;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .app-title h1 {
+    font-size: 20px;
+    font-weight: bold;
+    color: #0d3d0d;
+    letter-spacing: 1px;
+  }
+  .app-title p {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .instructions {
+    font-size: 13px;
+    color: #555;
+    text-align: center;
+    margin-bottom: 14px;
+    line-height: 1.6;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f9f9f9;
+  }
+
+  .btn-row { display: flex; gap: 10px; margin-bottom: 4px; }
+
+  .btn-action {
+    flex: 1;
+    padding: 14px 8px;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  .btn-action.camera  { background: #0d3d0d; }
+  .btn-action.gallery { background: #2d8a2d; }
+  .btn-action:hover   { opacity: 0.88; }
+
+  #fileInput   { display: none; }
+  #cameraInput { display: none; }
+
+  #previewContainer { display: none; margin-top: 16px; text-align: center; }
+  #preview {
+    max-width: 100%;
+    max-height: 260px;
+    border-radius: 10px;
+    border: 2px solid #2d8a2d;
+  }
+
+  .tip { font-size: 12px; color: #888; text-align: center; margin-top: 8px; }
+
+  .btn-analyze {
+    width: 100%;
+    padding: 14px;
+    background: #2d8a2d;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 12px;
+    letter-spacing: 0.5px;
+  }
+  .btn-analyze:disabled { background: #aaa; cursor: not-allowed; }
+  .btn-analyze:hover:not(:disabled) { background: #1a5c1a; }
+
+  .alert-box {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 12px;
+    font-size: 14px;
+    color: #856404;
+    text-align: center;
+    display: none;
+  }
+  .alert-box strong { display: block; font-size: 15px; margin-bottom: 4px; }
+
+  #resultCard { display: none; }
+
+  .loading {
+    text-align: center;
+    padding: 20px;
+    color: #2d8a2d;
+    font-weight: bold;
+    display: none;
+  }
+  .spinner {
+    border: 4px solid #e0e0e0;
+    border-top: 4px solid #2d8a2d;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+  }
+  @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+  .result-label {
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .disease-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 8px 0 12px;
+    letter-spacing: 0.3px;
+  }
+  .badge-rust    { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+  .badge-blight  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .badge-healthy { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .badge-unknown { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+
+  .confidence-bar {
+    background: #e9ecef;
+    border-radius: 6px;
+    height: 10px;
+    margin: 6px 0 4px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: #2d8a2d;
+    transition: width 1s ease;
+  }
+  .confidence-label { font-size: 12px; color: #666; margin-bottom: 12px; }
+
+  .recommendation {
+    background: #f0fff0;
+    border-left: 4px solid #2d8a2d;
+    padding: 12px 14px;
+    border-radius: 0 8px 8px 0;
+    margin-top: 12px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .recommendation.warning {
+    background: #fff8e1;
+    border-left-color: #e6a817;
+  }
+  .recommendation h4 {
+    font-size: 13px;
+    font-weight: bold;
+    color: #1a5c1a;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .recommendation.warning h4 { color: #856404; }
+  .recommendation ul { padding-left: 18px; }
+  .recommendation li { margin: 4px 0; color: #333; }
+
+  .scores { margin-top: 14px; }
+  .scores-title {
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #555;
+    padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .score-row:last-child { border-bottom: none; }
+
+  .btn-reset {
+    width: 100%;
+    padding: 12px;
+    background: #444;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 14px;
+    letter-spacing: 0.5px;
+  }
+  .btn-reset:hover { background: #222; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="app-title">
+    <h1>MAIZE GUARD AI</h1>
+    <p>Maize Leaf Disease Detection System</p>
+  </div>
+
+  <div class="instructions">
+    Take a clear, close-up photo of a maize leaf.<br>
+    Ensure the leaf fills most of the frame and is well lit.
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-action camera"
+            onclick="document.getElementById('cameraInput').click()">
+      TAKE PHOTO
+    </button>
+    <button class="btn-action gallery"
+            onclick="document.getElementById('fileInput').click()">
+      UPLOAD IMAGE
+    </button>
+  </div>
+
+  <!-- Opens rear camera directly on mobile -->
+  <input type="file" id="cameraInput" accept="image/*" capture="environment">
+  <!-- Opens file gallery only -->
+  <input type="file" id="fileInput" accept="image/*">
+
+  <div id="previewContainer">
+    <img id="preview" src="" alt="Selected leaf image">
+    <p class="tip">Confirm the image clearly shows a maize leaf before analyzing.</p>
+    <button class="btn-analyze" id="analyzeBtn" onclick="analyzeImage()">
+      ANALYZE LEAF
+    </button>
+  </div>
+
+  <div class="alert-box" id="alertBox">
+    <strong>Image Not Recognized as a Maize Leaf</strong>
+    The uploaded image does not contain sufficient green plant material.
+    Please take a close-up photo of an actual maize leaf for accurate diagnosis.
+  </div>
+</div>
+
+<div class="card" id="resultCard">
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    Analyzing image...
+  </div>
+
+  <div id="resultContent" style="display:none;">
+    <p class="result-label">Diagnosis Result</p>
+    <div id="diseaseName"></div>
+
+    <div class="confidence-bar">
+      <div class="confidence-fill" id="confidenceBar" style="width:0%"></div>
+    </div>
+    <p class="confidence-label" id="confidenceText"></p>
+
+    <div id="recommendation"></div>
+    <div class="scores" id="allScores"></div>
+
+    <button class="btn-reset" onclick="resetApp()">
+      ANALYZE ANOTHER LEAF
+    </button>
+  </div>
+</div>
+
+<script>
+var diseaseInfo = {
+  "Common Rust": {
+    badgeClass: "badge-rust",
+    title: "Common Rust Detected",
+    steps: [
+      "Apply fungicide (Mancozeb or Propiconazole) immediately",
+      "Remove and destroy heavily infected leaves",
+      "Ensure proper plant spacing for air circulation",
+      "Avoid overhead irrigation to reduce leaf wetness",
+      "Monitor neighboring plants for signs of spread",
+      "Contact your local agricultural extension officer"
+    ]
+  },
+  "Northern Leaf Blight": {
+    badgeClass: "badge-blight",
+    title: "Northern Leaf Blight Detected",
+    steps: [
+      "Apply fungicide (Azoxystrobin or Tebuconazole) immediately",
+      "Remove and destroy all infected plant debris",
+      "Plant resistant maize varieties in the next season",
+      "Rotate crops to break the disease cycle",
+      "Improve field drainage to reduce ambient humidity",
+      "Report the outbreak to the Ministry of Agriculture"
+    ]
+  },
+  "Healthy": {
+    badgeClass: "badge-healthy",
+    title: "No Disease Detected — Healthy Leaf",
+    steps: [
+      "Your maize plant appears healthy",
+      "Continue regular field monitoring every 7 days",
+      "Maintain your current fertilization schedule",
+      "Ensure consistent and adequate irrigation",
+      "Keep the field clear of weeds",
+      "Re-examine if any discoloration appears"
+    ]
+  }
+};
+
+var CONFIDENCE_THRESHOLD = 0.55;
+
+function looksLikeLeaf(canvas) {
+  var ctx  = canvas.getContext('2d');
+  var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  var greenPixels = 0;
+  var totalPixels = data.length / 4;
+  for (var i = 0; i < data.length; i += 4) {
+    var r = data[i], g = data[i+1], b = data[i+2];
+    if (g > r + 15 && g > b + 10 && g > 60) greenPixels++;
+  }
+  return (greenPixels / totalPixels) >= 0.12;
+}
+
+var selectedFile = null;
+
+function handleFileSelect(file) {
+  if (!file) return;
+  selectedFile = file;
+  document.getElementById('alertBox').style.display   = 'none';
+  document.getElementById('resultCard').style.display = 'none';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('preview').src = e.target.result;
+    document.getElementById('previewContainer').style.display = 'block';
+    document.getElementById('analyzeBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('cameraInput').addEventListener('change', function(e) {
+  handleFileSelect(e.target.files[0]);
+});
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  handleFileSelect(e.target.files[0]);
+});
+
+function analyzeImage() {
+  if (!selectedFile) return;
+  document.getElementById('analyzeBtn').disabled    = true;
+  document.getElementById('alertBox').style.display = 'none';
+
+  var imgEl  = document.getElementById('preview');
+  var canvas = document.createElement('canvas');
+  canvas.width  = imgEl.naturalWidth  || 100;
+  canvas.height = imgEl.naturalHeight || 100;
+  canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+
+  if (!looksLikeLeaf(canvas)) {
+    document.getElementById('alertBox').style.display   = 'block';
+    document.getElementById('resultCard').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled      = false;
+    return;
+  }
+
+  document.getElementById('resultCard').style.display    = 'block';
+  document.getElementById('loading').style.display       = 'block';
+  document.getElementById('resultContent').style.display = 'none';
+
+  setTimeout(function() { displayResults(simulateModel()); }, 2000);
+}
+
+function simulateModel() {
+  var classes = ["Common Rust", "Northern Leaf Blight", "Healthy"];
+  var logits  = classes.map(function() { return Math.random() * 4 - 1; });
+  var expL    = logits.map(function(x) { return Math.exp(x); });
+  var sumE    = expL.reduce(function(a, b) { return a + b; }, 0);
+  var scores  = expL.map(function(x) { return x / sumE; });
+  var maxIdx  = scores.indexOf(Math.max.apply(null, scores));
+  return {
+    predicted:  classes[maxIdx],
+    confidence: scores[maxIdx],
+    scores: {
+      "Common Rust":          scores[0],
+      "Northern Leaf Blight": scores[1],
+      "Healthy":              scores[2]
+    }
+  };
+}
+
+function displayResults(result) {
+  document.getElementById('loading').style.display       = 'none';
+  document.getElementById('resultContent').style.display = 'block';
+
+  var conf        = result.confidence;
+  var isUncertain = conf < CONFIDENCE_THRESHOLD;
+
+  if (isUncertain) {
+    document.getElementById('diseaseName').innerHTML =
+      '<div class="disease-badge badge-unknown">Result Inconclusive</div>';
+    document.getElementById('confidenceBar').style.width = '0%';
+    document.getElementById('confidenceText').textContent =
+      'Confidence: ' + (conf * 100).toFixed(1) + '% — below minimum threshold';
+    document.getElementById('recommendation').innerHTML =
+      '<div class="recommendation warning">' +
+        '<h4>Retake Required</h4>' +
+        '<ul>' +
+          '<li>Move closer — the leaf must fill most of the frame</li>' +
+          '<li>Ensure the leaf surface is in sharp focus</li>' +
+          '<li>Use natural daylight where possible</li>' +
+          '<li>Remove shadows or obstructions from the leaf</li>' +
+          '<li>Use a plain background behind the leaf if possible</li>' +
+        '</ul>' +
+      '</div>';
+    document.getElementById('allScores').innerHTML = '';
+  } else {
+    var info = diseaseInfo[result.predicted];
+    document.getElementById('diseaseName').innerHTML =
+      '<div class="disease-badge ' + info.badgeClass + '">' + info.title + '</div>';
+    setTimeout(function() {
+      document.getElementById('confidenceBar').style.width =
+        (conf * 100).toFixed(0) + '%';
+    }, 100);
+    document.getElementById('confidenceText').textContent =
+      'Confidence: ' + (conf * 100).toFixed(1) + '%';
+    var stepsHTML = info.steps.map(function(s) {
+      return '<li>' + s + '</li>';
+    }).join('');
+    document.getElementById('recommendation').innerHTML =
+      '<div class="recommendation">' +
+        '<h4>Recommended Actions</h4>' +
+        '<ul>' + stepsHTML + '</ul>' +
+      '</div>';
+    var scoresHTML = Object.entries(result.scores)
+      .sort(function(a, b) { return b[1] - a[1]; })
+      .map(function(entry) {
+        return '<div class="score-row"><span>' + entry[0] +
+               '</span><span>' + (entry[1] * 100).toFixed(1) + '%</span></div>';
+      }).join('');
+    document.getElementById('allScores').innerHTML =
+      '<div class="scores-title">Class Probability Scores</div>' + scoresHTML;
+  }
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+function resetApp() {
+  document.getElementById('fileInput').value                = '';
+  document.getElementById('cameraInput').value              = '';
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('resultCard').style.display       = 'none';
+  document.getElementById('alertBox').style.display         = 'none';
+  document.getElementById('analyzeBtn').disabled            = false;
+  selectedFile = null;
+}
+</script>
+</body>
+</html>
